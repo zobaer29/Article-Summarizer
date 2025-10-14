@@ -17,43 +17,66 @@ class TextSummarizer:
             'they','them','their','this','that','these','those','i','you','he','she','we'
         }
 
+    # ✅ FIXED: First split sentences, THEN clean
     def preprocess_text(self, text):
-        text = re.sub(r'[^\w\s]',' ',text.lower())
-        sentences = re.split(r'(?<=\.|\?|\!)\s', text)
+        # Split text into sentences using punctuation
+        sentences = re.split(r'(?<=[.!?])\s+', text.strip())
         sentences = [s.strip() for s in sentences if s.strip()]
+
         tokenized_sentences = []
         for s in sentences:
-            words = [w for w in s.split() if w not in self.stop_words and len(w)>2]
+            # Clean and tokenize
+            cleaned = re.sub(r'[^\w\s]', '', s.lower())
+            words = [w for w in cleaned.split() if w not in self.stop_words and len(w) > 2]
             tokenized_sentences.append(words)
+
         return tokenized_sentences, sentences
 
+    # ✅ IMPROVED: Normalized word frequencies and sentence scoring
     def score_sentences(self, tokenized_sentences):
         word_freq = Counter(w for s in tokenized_sentences for w in s)
+        if not word_freq:
+            return [0 for _ in tokenized_sentences]
+
+        max_freq = max(word_freq.values())
+        for w in word_freq:
+            word_freq[w] /= max_freq
+
         sentence_scores = []
         for sentence in tokenized_sentences:
-            if len(sentence)==0: sentence_scores.append(0); continue
-            score = sum(word_freq[w] for w in sentence)/len(sentence)
+            if not sentence:
+                sentence_scores.append(0)
+                continue
+            # Average normalized word frequency per sentence
+            score = sum(word_freq[w] for w in sentence) / len(sentence)
             sentence_scores.append(score)
         return sentence_scores
 
+    # ✅ Better ranking logic with redundancy control
     def summarize(self, text, summary_length=3):
         tokenized, sentences = self.preprocess_text(text)
-        if not sentences: return "No meaningful content to summarize."
+        if not sentences:
+            return "No meaningful content to summarize."
         summary_length = min(summary_length, len(sentences))
         scores = self.score_sentences(tokenized)
 
+        # Rank by score (descending)
         ranked = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
         selected = []
         selected_words = set()
         for idx, _ in ranked:
             words = set(tokenized[idx])
-            overlap = len(words & selected_words)/max(len(words),1)
-            if overlap < 0.5:  # skip highly overlapping sentences
+            # Allow some overlap, but not too much
+            overlap = len(words & selected_words) / max(len(words), 1)
+            if overlap < 0.7:
                 selected.append(idx)
                 selected_words.update(words)
-            if len(selected)>=summary_length: break
+            if len(selected) >= summary_length:
+                break
+
         selected.sort()
         return ' '.join([sentences[i] for i in selected])
+
 
 # --------------------------
 # Text Analyzer
