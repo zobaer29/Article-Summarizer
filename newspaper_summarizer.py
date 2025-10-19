@@ -2,10 +2,10 @@ from flask import Flask, request, jsonify, render_template
 import re
 from collections import Counter
 import numpy as np
-from Fake_Detection import train_model, predict_input, W, b
+from Fake_Detection import train_model, predict_input  # ✅ lowercase file name
 
-# Train fake news model once on startup
-train_model()  
+# ✅ Train fake news model once on startup and store weights/vocab
+W, b, vocab, word_to_index = train_model()
 
 app = Flask(__name__)
 
@@ -126,11 +126,14 @@ def analyze_text():
     text = data.get('text', '')
     stats = analyzer.get_text_stats(text)
     readability = analyzer.calculate_readability(text)
-    if W is not None and text.strip():
+
+    # ✅ Use global W, vocab to check if model is ready
+    if W is not None and vocab is not None and text.strip():
         prediction_label, confidence_score = predict_input(text)
     else:
         prediction_label = "⚠️ PENDING"
         confidence_score = 0.5
+
     return jsonify({
         'words': stats['words'],
         'sentences': stats['sentences'],
